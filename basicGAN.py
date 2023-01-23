@@ -1,8 +1,4 @@
-"""GAN Implementation.ipynb
-
-# Implementation of Basic Generative Adversarial Network in PyTorch.
-"""
-
+import tensorboard
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -11,6 +7,9 @@ import torchvision.datasets as datasets
 from torch.utils.data import DataLoader
 from torchvision import transforms
 from torch.utils.tensorboard import SummaryWriter
+
+# Commented out IPython magic to ensure Python compatibility.
+# %load_ext tensorboard
 
 """Defining our Discriminator and Generator classes."""
 
@@ -22,7 +21,9 @@ class Discriminator(nn.Module):
     self.disc = nn.Sequential(
         nn.Linear(img_dim, 128),  # Hidden Layer 1 with 128 nodes.
         nn.LeakyReLU(0.1),  # Activation for HL1.
-        nn.Linear(128, 1),  # Output Node. This has only 1 node because it's output is real of fake.
+        nn.Linear(128, 64), # Hidden Layer 2 with 64 nodes.
+        nn.LeakyReLU(0.1),  # Activation for HL2
+        nn.Linear(64, 1),  # Output Node. This has only 1 node because it's output is real of fake.
         nn.Sigmoid(), # Activation Function for the output node.
     )
 
@@ -38,7 +39,9 @@ class Generator(nn.Module):
     self.gen = nn.Sequential(
         nn.Linear(z_dim, 256),  #  Hidden Layer 1 - 256 nodes.
         nn.LeakyReLU(0.1),  # Activation Function
-        nn.Linear(256, img_dim),  # Output layer. Nodes same dim as our img data.
+        nn.Linear(256, 128),
+        nn.LeakyReLU(0.1),
+        nn.Linear(128, img_dim),  # Output layer. Nodes same dim as our img data.
         #  To make sure output of pixel values is b/w -1 and 1. This is because we normalize our input to be b/w -1 and 1.
         nn.Tanh(),  # Activation Function.
     )
@@ -57,7 +60,8 @@ num_epochs = 50
 disc = Discriminator(image_dim).to(device)
 gen = Generator(z_dim, image_dim).to(device)
 
-# noise. tensor filled with random numbers from a normal distribution.
+# noise; tensor filled with random numbers from a normal distribution.
+# We'll use this noise to test our generator later on i.e after the training. It's basically input for testing.
 fixed_noise = torch.randn((batch_size, z_dim)).to(device) # Moving the tensor to GPU if available.
 
 # Transforms is used for image transformations. It's basically for image transformation, augmentation.
@@ -83,7 +87,7 @@ criterion = nn.BCELoss()
 # Tensorboard
 writer_fake = SummaryWriter(f'runs/GAN_MNIST/fake')
 writer_real = SummaryWriter(f'runs/GAN_MNIST/real')
-step = 0
+step = 0  # For tracking training per epoch.
 
 # Training loop
 for epoch in range(num_epochs):
@@ -128,23 +132,29 @@ for epoch in range(num_epochs):
     # Code for Tensorboard
     if batch_idx == 0:
       print(
-          f'Epoch [{epoch}/{num_epochs}] \ '
+          f'Epoch [{epoch+1}/{num_epochs}] \ '
           f'Loss D: {lossD: .4f}, Loss G: {lossG: .4f}'
       )
 
       with torch.no_grad():
-        fake = gen(fixed_noise).reshape(-1, 1, 28, 28)
+        fake = gen(fixed_noise).reshape(-1, 1, 28, 28)  # batch_size, channel, height, width
         data = real.reshape(-1, 1, 28, 28)
+        # Creating a grid of real and generated images.
         img_grid_fake = torchvision.utils.make_grid(fake, normalize=True)
         img_grid_real = torchvision.utils.make_grid(data, normalize=True)
 
+        # Adding the fake images to tensorboard log for tracking.
         writer_fake.add_image(
-            "Mnist Fake Images", img_grid_fake, global_step=step
+            "MNIST Fake Images", img_grid_fake, global_step=step
         )
 
+        # Adding the real images to tensorboard log for tracking.
         writer_real.add_image(
-            "Mnist Real Images", img_grid_real, global_step=step
+            "MNIST Real Images", img_grid_real, global_step=step
         )
 
         step += 1
+
+# Commented out IPython magic to ensure Python compatibility.
+# %tensorboard --logdir runs/GAN_MNIST/
 
